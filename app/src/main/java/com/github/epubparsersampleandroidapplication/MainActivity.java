@@ -19,6 +19,7 @@ import android.text.Html;
 import android.text.TextUtils;
 import android.util.Base64;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -34,6 +35,10 @@ import com.github.mertakdut.CssStatus;
 import com.github.mertakdut.Reader;
 import com.github.mertakdut.exception.OutOfPagesException;
 import com.github.mertakdut.exception.ReadingException;
+
+import org.json.JSONException;
+
+import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity implements PageFragment.OnFragmentReadyListener {
 
@@ -61,6 +66,8 @@ public class MainActivity extends AppCompatActivity implements PageFragment.OnFr
 
     private boolean isSkippedToPage = false;
 
+    private Book book;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
 
@@ -81,6 +88,7 @@ public class MainActivity extends AppCompatActivity implements PageFragment.OnFr
         if (getIntent() != null && getIntent().getExtras() != null) {
             String filePath = getIntent().getExtras().getString("filePath");
             isPickedWebView = getIntent().getExtras().getBoolean("isWebView");
+            book = (Book) getIntent().getExtras().get("book");
 
             try {
                 reader = new Reader();
@@ -95,9 +103,16 @@ public class MainActivity extends AppCompatActivity implements PageFragment.OnFr
                 reader.setFullContent(filePath);
 
 //                int lastSavedPage = reader.setFullContentWithProgress(filePath);
-                if (reader.isSavedProgressFound()) {
-                    int lastSavedPage = reader.loadProgress();
+                //if (reader.isSavedProgressFound()) {
+                if (reader.isSavedProgressFound() && book != null) {
+                    //int lastSavedPage = reader.loadProgress();
+                    int lastSavedPage = book.getLine();
                     mViewPager.setCurrentItem(lastSavedPage);
+                } else {
+                    if(book == null)
+                        Toast.makeText(this.getApplicationContext(), "book == null", Toast.LENGTH_SHORT).show();
+                    if(!reader.isSavedProgressFound())
+                        Toast.makeText(this.getApplicationContext(), "no saved progress found", Toast.LENGTH_SHORT).show();
                 }
 
             } catch (ReadingException e) {
@@ -158,7 +173,8 @@ public class MainActivity extends AppCompatActivity implements PageFragment.OnFr
 
                         if (skippingPage >= 0) {
                             isSkippedToPage = true;
-                            mViewPager.setCurrentItem(skippingPage);
+                            //mViewPager.setCurrentItem(skippingPage);
+                            mViewPager.setCurrentItem(5);
                         } else {
                             Toast.makeText(MainActivity.this, "Page number can't be less than 0", Toast.LENGTH_LONG).show();
                         }
@@ -197,6 +213,20 @@ public class MainActivity extends AppCompatActivity implements PageFragment.OnFr
         super.onStop();
         try {
             reader.saveProgress(mViewPager.getCurrentItem());
+            book.setLine(mViewPager.getCurrentItem());
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try  {
+                        Log.i("UPDATETHREAD::", "About to updateBook");
+                        ApacheHttpClientGet.updateBook(book, book.getUser());
+                        Log.i("UPDATETHREAD::", "Saved page: " + mViewPager.getCurrentItem() + "...");
+                        Thread.currentThread().stop();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }); thread.start();
             Toast.makeText(MainActivity.this, "Saved page: " + mViewPager.getCurrentItem() + "...", Toast.LENGTH_LONG).show();
         } catch (ReadingException e) {
             e.printStackTrace();

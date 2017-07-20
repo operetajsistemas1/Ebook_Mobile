@@ -25,11 +25,15 @@ import com.github.mertakdut.exception.ReadingException;
 
 import android.app.Activity;
 
+import org.json.JSONException;
+
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Vector;
 
 public class MenuActivity extends AppCompatActivity {
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
@@ -38,9 +42,20 @@ public class MenuActivity extends AppCompatActivity {
             Manifest.permission.WRITE_EXTERNAL_STORAGE
     };
     private ProgressBar progressBar;
+    private ApacheHttpClientGet client;
+    private User user;
+    private Vector<Book> books;
+    private Book book;
+    private String defaultDirectory;
+    static boolean finished = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        user = new User("user1", "password1");
+        updateUser(); // Starts a thread
+
+        Log.i("oncreate","on create !!!!!!");
+        defaultDirectory = Environment.getExternalStorageDirectory().toString() + "/Download/";
         verifyStoragePermissions(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_menu);
@@ -52,13 +67,69 @@ public class MenuActivity extends AppCompatActivity {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
                 String clickedItemFilePath = ((BookInfo) adapterView.getAdapter().getItem(i)).getFilePath();
-                askForWidgetToUse(clickedItemFilePath);
+                //askForWidgetToUse(clickedItemFilePath);
+                updateUser();
+                while(!finished);
+                books = user.getItems();
+                startMainActivity();
             }
         });
 
         progressBar = (ProgressBar) findViewById(R.id.progressbar);
 
+
+
+        while(!finished);
+        books = user.getItems();
+        Log.i("info1",user.toString());
+        startMainActivity();
+
         new ListBookInfoTask().execute();
+    }
+
+    public Book getActiveBook(Vector<Book> books, int id){
+        Book result = new Book();
+        for(Book b : books){
+            if(b.getId() == id)
+                result = b;
+        }
+        return result;
+    }
+
+    private void updateUser(){
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try  {
+                    finished = false;
+                    user = ApacheHttpClientGet.searchUser(user);
+                    Log.i("info2",user.toString());
+                    finished = true;
+                    Thread.currentThread().stop();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    finished = true;
+                }
+            }
+        }); thread.start();
+    }
+
+    private void startMainActivity(){
+        if(books != null) {
+            book = getActiveBook(books, user.getBookId());
+            if(book != null) {
+                book.setUser(user);
+                final Intent intent = new Intent(MenuActivity.this, MainActivity.class);
+                intent.putExtra("filePath", defaultDirectory + book.getName() + ".epub");
+                intent.putExtra("isWebView", false);
+                intent.putExtra("book", book);
+                startActivity(intent);
+            } else {
+                Toast.makeText(getApplicationContext(), "booK == null", Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            Toast.makeText(getApplicationContext(), "bookS == null", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private class ListBookInfoTask extends AsyncTask<Object, Object, List<BookInfo>> {
@@ -74,6 +145,7 @@ public class MenuActivity extends AppCompatActivity {
         @Override
         protected List<BookInfo> doInBackground(Object... params) {
             List<BookInfo> bookInfoList = searchForPdfFiles();
+
 
             Reader reader = new Reader();
             for (BookInfo bookInfo : bookInfoList) {
@@ -147,7 +219,7 @@ public class MenuActivity extends AppCompatActivity {
             //   files.add(0, sampleFile);
             Log.i("searchForPdfFiles", String.valueOf(files.length));
             for (int i = 0; i < files.length; i++) {
-                if (files[i].getName().substring(files[i].getName().length() - 5,
+                if (files[i].getName().length() >= 5 && files[i].getName().substring(files[i].getName().length() - 5,
                         files[i].getName().length()).equals(".epub")) {
                     Log.i("searchForPdfFiles", files[i].getAbsolutePath());
                     BookInfo bookInfo = new BookInfo();
@@ -207,6 +279,9 @@ public class MenuActivity extends AppCompatActivity {
         final Intent intent = new Intent(MenuActivity.this, MainActivity.class);
         intent.putExtra("filePath", filePath);
 
+        intent.putExtra("isWebView", false);
+        startActivity(intent);
+
         new AlertDialog.Builder(MenuActivity.this)
                 .setTitle("Pick your widget")
                 .setMessage("Textview or WebView?")
@@ -224,6 +299,7 @@ public class MenuActivity extends AppCompatActivity {
                 })
                 .setIcon(android.R.drawable.ic_dialog_alert)
                 .show();
+
 
 
     }

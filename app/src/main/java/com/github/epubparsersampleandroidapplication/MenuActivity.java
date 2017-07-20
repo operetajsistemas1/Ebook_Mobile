@@ -51,7 +51,7 @@ public class MenuActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        user = new User("user1", "password1");
+        user = new User("Andris", "password1");
         updateUser(); // Starts a thread
 
         Log.i("oncreate","on create !!!!!!");
@@ -59,7 +59,12 @@ public class MenuActivity extends AppCompatActivity {
         verifyStoragePermissions(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_menu);
-
+        //TODO: New user cant allow permission for external storage since app is crashing instantly
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 

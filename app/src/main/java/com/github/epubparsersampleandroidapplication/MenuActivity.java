@@ -1,5 +1,10 @@
 package com.github.epubparsersampleandroidapplication;
 
+import android.Manifest;
+import android.app.Activity;
+import android.content.pm.PackageManager;
+import android.support.v4.app.ActivityCompat;
+import android.util.Log;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.AsyncTask;
@@ -13,9 +18,12 @@ import android.widget.AdapterView;
 import android.widget.GridView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
+import android.Manifest.permission.*;
 
 import com.github.mertakdut.Reader;
 import com.github.mertakdut.exception.ReadingException;
+
+import android.app.Activity;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -24,11 +32,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MenuActivity extends AppCompatActivity {
-
+    private static final int REQUEST_EXTERNAL_STORAGE = 1;
+    private static String[] PERMISSIONS_STORAGE = {
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+    };
     private ProgressBar progressBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        verifyStoragePermissions(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_menu);
 
@@ -101,26 +114,49 @@ public class MenuActivity extends AppCompatActivity {
         }
     }
 
-    private List<BookInfo> searchForPdfFiles() {
-        boolean isSDPresent = Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED);
+    public static void verifyStoragePermissions(Activity activity) {
+        // Check if we have write permission
+        int permission = ActivityCompat.checkSelfPermission(activity, Manifest.permission.READ_EXTERNAL_STORAGE);
 
+        if (permission != PackageManager.PERMISSION_GRANTED) {
+            // We don't have permission so prompt the user
+            ActivityCompat.requestPermissions(
+                    activity,
+                    PERMISSIONS_STORAGE,
+                    REQUEST_EXTERNAL_STORAGE
+            );
+        }
+    }
+
+    private List<BookInfo> searchForPdfFiles() {
+        Log.i("searchForPdfFiles", "searchForPdfFiles");
+        boolean isSDPresent = Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED);
+        Log.i("isdpressent ", String.valueOf(isSDPresent));
         List<BookInfo> bookInfoList = null;
 
         if (isSDPresent) {
             bookInfoList = new ArrayList<>();
 
-            List<File> files = getListFiles(new File(Environment.getExternalStorageDirectory().getAbsolutePath()));
+            File directory = new File(Environment.getExternalStorageDirectory().toString() + "/Download/");
+            File[] files = directory.listFiles();
+            if (files == null) {
+                Log.i("searchForPdfFiles", "files are null");
+            }
+            Log.i("searchForPdfFiles", (Environment.getExternalStorageDirectory().toString() + "/Download/"));
+            //   File sampleFile = getFileFromAssets("pg28885-images_new.epub");
+            //   files.add(0, sampleFile);
+            Log.i("searchForPdfFiles", String.valueOf(files.length));
+            for (int i = 0; i < files.length; i++) {
+                if (files[i].getName().substring(files[i].getName().length() - 5,
+                        files[i].getName().length()).equals(".epub")) {
+                    Log.i("searchForPdfFiles", files[i].getAbsolutePath());
+                    BookInfo bookInfo = new BookInfo();
 
-            File sampleFile = getFileFromAssets("pg28885-images_new.epub");
-            files.add(0, sampleFile);
+                    bookInfo.setTitle(files[i].getName());
+                    bookInfo.setFilePath(files[i].getPath());
 
-            for (File file : files) {
-                BookInfo bookInfo = new BookInfo();
-
-                bookInfo.setTitle(file.getName());
-                bookInfo.setFilePath(file.getPath());
-
-                bookInfoList.add(bookInfo);
+                    bookInfoList.add(bookInfo);
+                }
             }
         }
 
